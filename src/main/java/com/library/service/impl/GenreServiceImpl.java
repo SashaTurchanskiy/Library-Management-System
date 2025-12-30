@@ -22,6 +22,11 @@ public class GenreServiceImpl implements GenreService {
     @Override
     public GenreDTO createGenre(GenreDTO genreDTO) {
         Genre genre = genreMapper.toEntity(genreDTO);
+
+        if (genreDTO.getParentGenreId() != null){
+            genreRepository.findById(genreDTO.getParentGenreId())
+                    .ifPresent(genre::setParentGenre);
+        }
         Genre savedGenre = genreRepository.save(genre);
         return genreMapper.toDTO(savedGenre);
 
@@ -39,7 +44,16 @@ public class GenreServiceImpl implements GenreService {
         Genre genre = genreRepository.findById(genreId).orElseThrow(
                 ()-> new GenreException("Genre not found")
         );
-        return genreMapper.toDTO(genre);
+        GenreDTO dto = genreMapper.toDTO(genre);
+        if (genre.getSubGenres() != null){
+            dto.setSubGenres(
+                    genre.getSubGenres().stream()
+                            .filter(Genre::getActive)
+                            .map(genreMapper::toDTO)
+                            .toList()
+            );
+        }
+        return dto;
     }
 
     @Override
