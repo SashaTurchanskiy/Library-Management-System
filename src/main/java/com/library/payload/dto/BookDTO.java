@@ -68,7 +68,9 @@ public class BookDTO {
     private Boolean alreadyHaveLoan;
     private Boolean alreadyHaveReservation;
 
-    private Boolean active;
+    @NotNull(message = "Active flag is mandatory")
+
+    private Boolean active = true;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

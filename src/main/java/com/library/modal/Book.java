@@ -55,6 +55,7 @@ public class Book {
 
     private String coverImageUrl;
 
+    @Builder.Default
     @Column(nullable = false)
     private Boolean active = true;
 

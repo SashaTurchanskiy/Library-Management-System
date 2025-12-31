@@ -8,9 +8,6 @@ import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface BookMapper {
-
-    @Mapping(source = "parentBook.id", target = "parentBookId")
-    @Mapping(source = "parentBook.name", target = "parentBookName")
     BookDTO toDTO(Book book);
 
     Book toEntity(BookDTO bookDTO);

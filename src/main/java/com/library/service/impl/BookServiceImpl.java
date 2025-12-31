@@ -36,7 +36,11 @@ public class BookServiceImpl implements BookService {
             throw new BookException("book with isbn " + bookDTO.getIsbn() + "already exist");
         }
         Book book = bookMapper.toEntity(bookDTO);
-
+        if (bookDTO.getGenreId() != null) {
+            Genre genre = genreRepository.findById(bookDTO.getGenreId())
+                    .orElseThrow(() -> new BookException("Genre with ID " + bookDTO.getGenreId() + " not found"));
+            book.setGenre(genre);
+        }
         book.isAvailableCopiesValid();
         Book savedBook =  bookRepository.save(book);
         return bookMapper.toDTO(savedBook);
