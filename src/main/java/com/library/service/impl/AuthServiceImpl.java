@@ -4,22 +4,26 @@ import com.library.config.JwtProvider;
 import com.library.domain.UserRole;
 import com.library.exception.UserException;
 import com.library.mapper.UserMapper;
+import com.library.modal.PasswordResetToken;
 import com.library.modal.User;
 import com.library.payload.dto.UserDTO;
 import com.library.payload.response.AuthResponse;
+import com.library.repository.PasswordResetTokenRepository;
 import com.library.repository.UserRepository;
 import com.library.service.AuthService;
+import com.library.service.EmailService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+
 import java.time.LocalDateTime;
-import java.util.Collection;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +35,8 @@ public class AuthServiceImpl implements AuthService {
     private final JwtProvider jwtProvider;
     private final UserMapper userMapper;
     private final CustomUserServiceImpl customUserServiceImpl;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailService emailService;
 
 
     @Override
@@ -98,17 +104,44 @@ public class AuthServiceImpl implements AuthService {
         return authResponse;
     }
 
-    @Override
+    @Transactional
     public void createPasswordResetToken(String email) throws UserException {
+        String frontedUrl = "http://localhost:5173";
         User user = userRepository.findByEmail(email);
         if (user == null){
             throw new UserException("user not found with given email");
         }
+        String token = UUID.randomUUID().toString();
+
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .token(token)
+                .user(user)
+                .expiryDate(LocalDateTime.now().plusMinutes(5))
+                .build();
+
+        passwordResetTokenRepository.save(resetToken);
+        String resetLink = frontedUrl + token;
+        String subject = "Password reset request";
+        String body = "You requested to reset your password. Use this link (valid for 5 minutes) " + resetLink;
+
+        //send email
+        emailService.sendEmail(user.getEmail(), subject, body);
 
     }
 
-    @Override
-    public void resetPassword(String token, String newPassword) {
+    @Transactional
+    public void resetPassword(String token, String newPassword) throws Exception {
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+            .orElseThrow(()-> new Exception("token not valid"));
+
+    if (resetToken.isExpired()){
+        passwordResetTokenRepository.delete(resetToken);
+        throw new Exception("token expired");
+    }
+    User user = resetToken.getUser();
+    user.setPassword(passwordEncoder.encode(newPassword));
+    userRepository.save(user);
+    passwordResetTokenRepository.delete(resetToken);
 
     }
 }
