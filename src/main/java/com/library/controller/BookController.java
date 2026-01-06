@@ -22,11 +22,11 @@ public class BookController {
 
     private final BookService bookService;
 
-    @PostMapping("/create")
+   /* @PostMapping("/admin/create")
     public ResponseEntity<BookDTO> createBook(@Valid @RequestBody BookDTO bookDTO) throws BookException {
         BookDTO createdBook = bookService.createBook(bookDTO);
         return ResponseEntity.ok(createdBook);
-    }
+    }*/
     @PostMapping("/create/bulk")
     public ResponseEntity<?> createBookBulk(@Valid @RequestBody List<BookDTO> bookDTO) throws BookException {
         List<BookDTO> createdBook = bookService.createBooksBulk(bookDTO);
