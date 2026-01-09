@@ -34,7 +34,6 @@ public class SubscriptionPlan {
     @Column(nullable = false)
     private Long price;
 
-    private String currency = "UAH";
 
     @Column(nullable = false)
     @Positive(message = "Maximum books allowed must be positive")
