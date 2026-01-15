@@ -32,10 +32,10 @@ public class Payment {
 
     private PaymentType paymentType;
 
-    private PaymentStatus paymentStatus;
+    private PaymentStatus status;
 
     @Enumerated(EnumType.STRING)
-    private PaymentGateway paymentGateway;
+    private PaymentGateway gateway;
 
     private Long amount; // Amount in smallest currency unit (e.g., cents)
 

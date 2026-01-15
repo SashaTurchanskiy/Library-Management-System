@@ -9,9 +9,10 @@ import org.springframework.data.domain.Pageable;
 
 public interface PaymentService {
 
-    PaymentInitiateResponse initiatePayment(PaymentInitiateRequest request);
+    PaymentInitiateResponse initiatePayment(PaymentInitiateRequest request) throws Exception;
 
     PaymentDTO verifyPayment(PaymentVerifyRequest request);
 
     Page<PaymentDTO> getAllPayments(Pageable pageable);
+
 }
