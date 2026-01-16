@@ -6,39 +6,58 @@ import com.library.payload.response.StripePaymentResponse;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
-import com.stripe.param.PaymentIntentCreateParams;
+import com.stripe.model.checkout.Session;
+import com.stripe.param.checkout.SessionCreateParams;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+
 @Service
 @RequiredArgsConstructor
 public class StripeService {
 
-    @Value("{stripe.secret.key}")
+    @Value("${stripe.secret.key}")
     private String secretKey;
 
     @PostConstruct
-    private void init(){
+    private void init() {
         Stripe.apiKey = secretKey;
     }
 
-    public StripePaymentResponse createPaymentIntent(User user, Payment payment) throws StripeException {
-        PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
-                .setAmount((long)(payment.getAmount() * 100))
-                .setCurrency("usd")
-                .setDescription(payment.getDescription())
-                .setReceiptEmail(user.getEmail())
-                .putMetadata("transactionId", payment.getTransactionId())
+    public StripePaymentResponse createCheckoutSession(User user, Payment payment, String successUrl, String cancelUrl) throws StripeException, StripeException {
+        SessionCreateParams params = SessionCreateParams.builder()
+                .setMode(SessionCreateParams.Mode.PAYMENT)
+                .setSuccessUrl(successUrl)
+                .setCancelUrl(cancelUrl)
+                .addLineItem(
+                        SessionCreateParams.LineItem.builder()
+                                .setQuantity(1L)
+                                .setPriceData(
+                                        SessionCreateParams.LineItem.PriceData.builder()
+                                                .setCurrency("usd")
+                                                .setUnitAmount(payment.getAmount()) // у центах
+                                                .setProductData(
+                                                        SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                                .setName(payment.getDescription())
+                                                                .build()
+                                                )
+                                                .build()
+                                )
+                                .build()
+                )
                 .build();
 
-        PaymentIntent intent = PaymentIntent.create(params);
+        Session session = Session.create(params);
 
         return StripePaymentResponse.builder()
-                .clientSecret(intent.getClientSecret())
-                .paymentIntentId(intent.getId())
-                .status(intent.getStatus())
+                .paymentIntentId(session.getPaymentIntent())
+                .status(session.getPaymentStatus())
+                .checkOutUrl(session.getUrl()) // ✅ ось справжня URL для користувача
                 .build();
+    }
+    public PaymentIntent retrievePaymentIntent(String paymentIntentId) throws StripeException {
+        return PaymentIntent.retrieve(paymentIntentId);
     }
 }

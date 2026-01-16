@@ -9,5 +9,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PaymentVerifyRequest {
 
+    private Long paymentId;
+    private String transactionId;
+    private String paymentIntentId;
+    private String gateway;
+
+
 
 }

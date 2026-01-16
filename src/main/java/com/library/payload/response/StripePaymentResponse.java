@@ -10,5 +10,7 @@ public class StripePaymentResponse {
 
     private String clientSecret;
     private String paymentIntentId;
+    private String checkOutUrl;
     private String status;
+    private boolean success;
 }

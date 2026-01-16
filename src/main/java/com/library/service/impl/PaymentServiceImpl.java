@@ -1,6 +1,7 @@
 package com.library.service.impl;
 
 import com.library.domain.PaymentStatus;
+import com.library.mapper.PaymentMapper;
 import com.library.modal.Payment;
 import com.library.modal.Subscription;
 import com.library.modal.User;
@@ -14,6 +15,7 @@ import com.library.repository.SubscriptionRepository;
 import com.library.repository.UserRepository;
 import com.library.service.PaymentService;
 import com.library.service.gateway.StripeService;
+import com.stripe.model.PaymentIntent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +32,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final StripeService stripeService;
+    private final PaymentMapper paymentMapper;
 
     @Override
     public PaymentInitiateResponse initiatePayment(PaymentInitiateRequest request) throws Exception {
@@ -55,7 +58,12 @@ public class PaymentServiceImpl implements PaymentService {
         }
         payment = paymentRepository.save(payment);
 
-        StripePaymentResponse stripeResponse = stripeService.createPaymentIntent(user, payment);
+        StripePaymentResponse stripeResponse = stripeService.createCheckoutSession(
+                user,
+                payment,
+                request.getSuccessUrl(),
+                request.getCancelUrl()
+        );
 
         PaymentInitiateResponse response = new PaymentInitiateResponse();
         response.setPaymentId(payment.getId());
@@ -63,7 +71,7 @@ public class PaymentServiceImpl implements PaymentService {
         response.setTransactionId(payment.getTransactionId());
         response.setAmount(payment.getAmount());
         response.setDescription(payment.getDescription());
-        response.setCheckOutUrl(stripeResponse.getClientSecret());
+        response.setCheckOutUrl(stripeResponse.getCheckOutUrl());
         response.setMessage("Stripe payment initiated");
         response.setSuccess(true);
 
@@ -71,12 +79,39 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PaymentDTO verifyPayment(PaymentVerifyRequest request) {
-        return null;
+    public PaymentDTO verifyPayment(PaymentVerifyRequest request) throws Exception {
+        try {
+            PaymentIntent intent = stripeService.retrievePaymentIntent(request.getPaymentIntentId());
+
+            Payment payment = paymentRepository.findByTransactionId(request.getTransactionId())
+                    .orElseThrow(()-> new Exception("Payment not found"));
+
+            switch (intent.getStatus()){
+                case "succeeded":
+                    payment.setStatus(PaymentStatus.SUCCESS);
+                    payment.setCompletedAt(LocalDateTime.now());
+                    break;
+                case "canceled":
+                case "requires_payment_method":
+                    payment.setStatus(PaymentStatus.FAILED);
+                    payment.setFailureReason(intent.getLastPaymentError() != null ? intent.getLastPaymentError().getMessage() : "Payment failed");
+                    break;
+                default:
+                    payment.setStatus(PaymentStatus.PENDING);
+            }
+
+            Payment savedPayment =  paymentRepository.save(payment);
+
+            return paymentMapper.toDTO(savedPayment);
+
+        }catch (Exception e){
+            throw new Exception("Error verify payment: " + e.getMessage(), e);
+        }
     }
 
     @Override
     public Page<PaymentDTO> getAllPayments(Pageable pageable) {
-        return null;
+        Page<Payment> paymentDTOS = paymentRepository.findAll(pageable);
+        return paymentDTOS.map(paymentMapper::toDTO);
     }
 }
