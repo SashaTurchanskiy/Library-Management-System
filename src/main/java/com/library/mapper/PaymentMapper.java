@@ -17,6 +17,8 @@ public interface PaymentMapper {
 
     @Mapping(source = "user.id", target = "userId")
     @Mapping(source = "subscription.id", target = "subscriptionId")
+    @Mapping(source = "user.fullName", target = "userName")
+    @Mapping(source = "user.email", target = "userEmail")
     PaymentDTO toDTO(Payment payment);
 
 }

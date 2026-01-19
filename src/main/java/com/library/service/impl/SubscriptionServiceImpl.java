@@ -1,16 +1,23 @@
 package com.library.service.impl;
 
+import com.library.domain.PaymentGateway;
+import com.library.domain.PaymentStatus;
+import com.library.domain.PaymentType;
 import com.library.exception.SubscriptionException;
 import com.library.mapper.SubscripMapper;
-import com.library.mapper.SubscriptionMapper;
 import com.library.modal.Subscription;
 import com.library.modal.SubscriptionPlan;
 import com.library.modal.User;
+import com.library.payload.dto.PaymentDTO;
 import com.library.payload.dto.SubscriptionDTO;
+import com.library.payload.request.PaymentInitiateRequest;
+import com.library.payload.request.PaymentVerifyRequest;
 import com.library.repository.SubscriptionPlanRepository;
 import com.library.repository.SubscriptionRepository;
+import com.library.service.PaymentService;
 import com.library.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,6 +34,15 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final SubscripMapper subscripMapper;
     private final UserServiceImpl userService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final PaymentService paymentService;
+
+
+    @Value("${stripe.success.url}")
+    private String successUrl;
+
+    @Value("${stripe.cancel.url}")
+    private String cancelUrl;
+
 
     @Override
     public SubscriptionDTO createSubscription(@RequestBody SubscriptionDTO subscriptionDTO) throws Exception {
@@ -42,6 +58,17 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         Subscription savedSub = subRepository.save(subscription);
 
         //create Payment todo
+        PaymentInitiateRequest paymentRequest = new PaymentInitiateRequest();
+        paymentRequest.setUserId(user.getId());
+        paymentRequest.setSubscriptionId(savedSub.getId());
+        paymentRequest.setPaymentType(PaymentType.FINE);
+        paymentRequest.setGateway(PaymentGateway.STRIPE);
+        paymentRequest.setAmount(plan.getPrice());
+        paymentRequest.setDescription("Оплата підписки: " + plan.getName());
+        paymentRequest.setSuccessUrl(successUrl);
+        paymentRequest.setCancelUrl(cancelUrl);
+
+        paymentService.initiatePayment(paymentRequest);
 
         return subscripMapper.toDTO(savedSub);
     }
@@ -74,19 +101,29 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     @Override
-    public SubscriptionDTO activateSubscription(Long subscriptionId, Long paymentId) throws SubscriptionException {
+    public SubscriptionDTO activateSubscription(Long subscriptionId, Long paymentId) throws Exception {
         Subscription subscription = subRepository.findById(subscriptionId)
                 .orElseThrow(() -> new SubscriptionException("Subscription not found with id: " + subscriptionId));
 
         //verify payment todo
+        PaymentVerifyRequest verifyRequest = new PaymentVerifyRequest();
+        verifyRequest.setPaymentIntentId(paymentId.toString());
+        //verifyRequest.setTransactionId(paymentDTO.getTransactionId());
+        try{
+            PaymentDTO paymentDTO = paymentService.verifyPayment(verifyRequest);
 
-        subscription.setIsActive(true);
-        subscription.calculateEndDate();
-
-        Subscription savedSub = subRepository.save(subscription);
-        return subscripMapper.toDTO(savedSub);
+            if (paymentDTO.getStatus() == PaymentStatus.SUCCESS){
+                subscription.setIsActive(true);
+                subscription.calculateEndDate();
+                Subscription savedSub = subRepository.save(subscription);
+                return subscripMapper.toDTO(savedSub);
+            }else {
+                throw new Exception("Payment not successful, subscription cannot be activated");
+            }
+        } catch (Exception e) {
+            throw new Exception("Error verifying payment: " + e.getMessage());
+        }
     }
-
     @Override
     public List<SubscriptionDTO> getAllSubscriptions(Pageable pageable) {
         List<Subscription> subscriptions = subRepository.findAll();
