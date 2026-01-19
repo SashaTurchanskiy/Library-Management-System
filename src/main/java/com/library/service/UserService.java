@@ -8,5 +8,6 @@ import java.util.List;
 public interface UserService {
     User getCurrentUser() throws Exception;
     List<UserDTO> getAllUsers();
+    User findById(Long id) throws Exception;
 
 }
